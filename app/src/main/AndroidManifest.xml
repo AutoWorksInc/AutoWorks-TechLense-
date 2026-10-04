@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:allowBackup="true" android:label="MekView" android:theme="@style/Theme.TechLense">
+    <application android:allowBackup="true" android:label="MekView" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/Theme.TechLense">
         <meta-data android:name="com.meta.wearable.mwdat.ANALYTICS_OPT_OUT" android:value="true" />
         <provider
             android:name="androidx.core.content.FileProvider"
