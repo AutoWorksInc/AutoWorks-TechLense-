@@ -1,31 +1,16 @@
 # AutoWorks TechLense Roadmap
-
-## Alpha 0.1 — closed-loop prototype
+## Alpha 0.1
 - [x] Connector contracts
-- [x] Technician workspace with simulated RO
-- [x] Simulated vehicle scan and DTC display
+- [x] Simulated RO, scan and repair-information flow
 - [x] Guided diagnostic step engine
 - [x] Technician pass/fault results
-- [x] Photo/video evidence data model and simulated capture
-- [x] Failed-component confirmation to estimate draft
-- [ ] Real Android camera evidence capture
+- [ ] Real Pixel photo/video evidence capture
 - [ ] Pre-scan vs post-scan comparison
 - [ ] Persist vehicle sessions locally
 
-## Alpha 0.2 — wearable workflow
+## Alpha 0.2
+- [ ] Verify Meta Wearables SDK build
 - [ ] Connect Ray-Ban Meta Gen 2
-- [ ] POV image capture
-- [ ] Voice technician interaction
-- [ ] Spoken guidance
+- [ ] POV capture
+- [ ] Voice interaction and spoken guidance
 - [ ] Multimodal component identification
-
-## Vendor integration track
-- [ ] Tekmetric authorized integration/webhook discovery
-- [ ] Autel supported diagnostic data path
-- [ ] Identifix authorized repair-information path
-- [ ] ProDemand authorized repair-information path
-- [ ] ALLDATA authorized repair-information path
-- [ ] NexPart ordering through Tekmetric where supported
-
-## Guardrails
-Simulated procedures are never marked verified. No scraping licensed repair information. No vendor passwords or API secrets in source control. Exact specs are VERIFIED only from an authorized source. Parts orders and customer-facing estimates require human confirmation.
