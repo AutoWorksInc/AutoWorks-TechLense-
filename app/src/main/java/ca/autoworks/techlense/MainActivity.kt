@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ca.autoworks.techlense.demo.*
 import ca.autoworks.techlense.diagnostics.*
@@ -16,6 +17,11 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun TechLenseAlpha(){
  var s by remember{mutableStateOf(DemoRepairSession())}
+ val context=LocalContext.current
+ val evidenceLaunchers=rememberEvidenceLaunchers(
+  createUri={type->EvidenceCapture.newEvidenceUri(context,type)},
+  onCaptured={type,uri->s=s.copy(evidence=s.evidence+InspectionEvidence((if(type==EvidenceMediaType.PHOTO)"photo-" else "video-")+(s.evidence.size+1),type,"Pixel camera "+type.name.lowercase()+" evidence",System.currentTimeMillis(),uri.toString(),false))}
+ )
  Scaffold(topBar={TopAppBar(title={Text("AutoWorks TechLense")})}){p->
   LazyColumn(Modifier.padding(p).padding(16.dp).fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)){
    item{Text("ALPHA 0.1 • GUIDED DIAGNOSTICS",style=MaterialTheme.typography.labelLarge);Text(s.roNumber+" • "+s.vehicle);Text(s.concern)}
@@ -39,8 +45,8 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
       } else if(step.technicianResult!=null) Text(step.technicianResult,style=MaterialTheme.typography.labelMedium)
      }}
     }
-    item{Button(onClick={s=s.copy(evidence=s.evidence+InspectionEvidence("photo-"+(s.evidence.size+1),EvidenceMediaType.PHOTO,"Simulated failed-component photo evidence",System.currentTimeMillis()))},Modifier.fillMaxWidth()){Text("CAPTURE PHOTO EVIDENCE (SIMULATED)")}}
-    item{OutlinedButton(onClick={s=s.copy(evidence=s.evidence+InspectionEvidence("video-"+(s.evidence.size+1),EvidenceMediaType.VIDEO,"Simulated failed-component video evidence",System.currentTimeMillis()))},Modifier.fillMaxWidth()){Text("CAPTURE VIDEO EVIDENCE (SIMULATED)")}}
+    item{Button(onClick=evidenceLaunchers.takePhoto,modifier=Modifier.fillMaxWidth()){Text("TAKE PHOTO WITH PIXEL")}}
+    item{OutlinedButton(onClick=evidenceLaunchers.takeVideo,modifier=Modifier.fillMaxWidth()){Text("RECORD VIDEO WITH PIXEL")}}
    }
    if(s.evidence.isNotEmpty()){
     item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("INSPECTION EVIDENCE",style=MaterialTheme.typography.titleMedium);s.evidence.forEach{Text(it.type.name+" • "+it.note)}}}}
