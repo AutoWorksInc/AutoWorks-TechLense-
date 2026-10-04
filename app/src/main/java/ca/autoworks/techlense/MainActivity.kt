@@ -44,7 +44,7 @@ import com.meta.wearable.dat.inputs.types.InputEvent
 import com.meta.wearable.dat.inputs.types.InputsConfiguration
 import com.meta.wearable.dat.speech.Speech
 import com.meta.wearable.dat.speech.addSpeech
-import com.meta.wearable.dat.core.isVoiceInvocationsIntent
+import com.meta.wearable.dat.core.voiceinvocations.isVoiceInvocationsIntent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +70,7 @@ class MainActivity:ComponentActivity(){
  private var glassesSpeech:Speech?=null
  private var commandTimeoutJob:Job?=null
  private var pendingCameraStart=false
+ private var pendingPhotoSource:String?=null
  private val _lastGlassesAction=MutableStateFlow("No capture yet")
  val lastGlassesAction:StateFlow<String> = _lastGlassesAction
 
@@ -91,7 +92,7 @@ class MainActivity:ComponentActivity(){
  override fun onStart(){super.onStart();val required=arrayOf(Manifest.permission.BLUETOOTH,Manifest.permission.BLUETOOTH_CONNECT);if(required.all{ContextCompat.checkSelfPermission(this,it)==PackageManager.PERMISSION_GRANTED}) Wearables.initialize(this) else datPermissions.launch(required)}
 
  fun connectGlasses(){
-  if(deviceSession!=null){_glassesStatus.value="Glasses connected • microphone listening";return}
+  if(deviceSession!=null){_glassesStatus.value="Glasses connected";return}
   _glassesStatus.value="Connecting glasses…"
   Wearables.createSession(AutoDeviceSelector())
    .onSuccess{session->
@@ -140,9 +141,23 @@ class MainActivity:ComponentActivity(){
   commandTimeoutJob?.cancel();commandTimeoutJob=null
   glassesSpeech?.stop()
   speechJob?.cancel();speechJob=null
-  deviceSession?.removeSpeech()
   glassesSpeech=null
   if(deviceSession!=null)_lastGlassesAction.value="Ready • say Hey Meta, start MekView"
+ }
+ private fun requestPhotoCapture(source:String){
+  pendingPhotoSource=source
+  if(glassesCamera!=null){captureInspectionPhoto(source);pendingPhotoSource=null;return}
+  lifecycleScope.launch{
+   Wearables.checkPermissionStatus(Permission.CAMERA).onSuccess{status->
+    if(status==PermissionStatus.Granted) startCameraForPendingCapture()
+    else cameraPermission.launch(Permission.CAMERA)
+   }.onFailure{error,_-> _lastGlassesAction.value="Camera permission check failed: "+error.description}
+  }
+ }
+ private fun startCameraForPendingCapture(){
+  val session=deviceSession?:run{_lastGlassesAction.value="Connect glasses first";return}
+  _lastGlassesAction.value="Opening camera for capture…"
+  attachGlassesCamera(session)
  }
  private fun handleGlassesCommand(text:String){
   val command=text.trim().lowercase()
