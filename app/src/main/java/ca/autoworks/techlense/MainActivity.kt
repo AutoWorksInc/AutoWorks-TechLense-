@@ -13,16 +13,16 @@ import ca.autoworks.techlense.demo.*
 import ca.autoworks.techlense.diagnostics.*
 import ca.autoworks.techlense.evidence.*
 
-class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{MaterialTheme{TechLenseAlpha()}}}}
+class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{MaterialTheme{MekViewAlpha()}}}}
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun TechLenseAlpha(){
+@Composable private fun MekViewAlpha(){
  var s by remember{mutableStateOf(DemoRepairSession())}
  val context=LocalContext.current
  val evidenceLaunchers=rememberEvidenceLaunchers(
   createUri={type->EvidenceCapture.newEvidenceUri(context,type)},
   onCaptured={type,uri->s=s.copy(evidence=s.evidence+InspectionEvidence((if(type==EvidenceMediaType.PHOTO)"photo-" else "video-")+(s.evidence.size+1),type,"Pixel camera "+type.name.lowercase()+" evidence",System.currentTimeMillis(),uri.toString(),false))}
  )
- Scaffold(topBar={TopAppBar(title={Text("AutoWorks TechLense")})}){p->
+ Scaffold(topBar={TopAppBar(title={Text("MekView")})}){p->
   LazyColumn(Modifier.padding(p).padding(16.dp).fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)){
    item{Text("ALPHA 0.1 • GUIDED DIAGNOSTICS",style=MaterialTheme.typography.labelLarge);Text(s.roNumber+" • "+s.vehicle);Text(s.concern)}
    item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("Connections",style=MaterialTheme.typography.titleMedium);Text("Tekmetric • SIMULATED");Text("Autel • SIMULATED");Text("Repair info • SIMULATED");Text("Ray-Ban Meta • FOUNDATION")}}}
@@ -39,8 +39,8 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
       Text("Step "+step.id,style=MaterialTheme.typography.titleMedium);Text(step.instruction)
       if(i==s.activeStep){
        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        Button(onClick={val n=s.diagnosticSteps.toMutableList();n[i]=step.copy(status=StepStatus.PASSED,technicianResult="Technician confirmed");s=s.copy(diagnosticSteps=n,activeStep=(i+1).coerceAtMost(n.size-1))}){Text("PASS")}
-        OutlinedButton(onClick={val n=s.diagnosticSteps.toMutableList();n[i]=step.copy(status=StepStatus.FAILED,technicianResult="Fault found");s=s.copy(diagnosticSteps=n,activeStep=(i+1).coerceAtMost(n.size-1))}){Text("FAULT FOUND")}
+        Button(onClick={val n=s.diagnosticSteps.toMutableList();n[i]=step.copy(status=StepStatus.PASSED,technicianResult="Technician confirmed");s=s.copy(diagnosticSteps=n,activeStep=i+1)}){Text("PASS")}
+        OutlinedButton(onClick={val n=s.diagnosticSteps.toMutableList();n[i]=step.copy(status=StepStatus.FAILED,technicianResult="Fault found");s=s.copy(diagnosticSteps=n,activeStep=i+1)}){Text("FAULT FOUND")}
        }
       } else if(step.technicianResult!=null) Text(step.technicianResult,style=MaterialTheme.typography.labelMedium)
      }}
