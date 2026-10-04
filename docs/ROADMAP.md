@@ -1,12 +1,14 @@
 # AutoWorks TechLense Roadmap
+
 ## Alpha 0.1 — closed-loop prototype
 - [x] Connector contracts
 - [x] Technician workspace with simulated RO
 - [x] Simulated vehicle scan and DTC display
-- [x] Simulated repair-information research
-- [x] Technician finding to estimate draft
-- [ ] Photo/video evidence capture
-- [ ] Guided diagnostic steps
+- [x] Guided diagnostic step engine
+- [x] Technician pass/fault results
+- [x] Photo/video evidence data model and simulated capture
+- [x] Failed-component confirmation to estimate draft
+- [ ] Real Android camera evidence capture
 - [ ] Pre-scan vs post-scan comparison
 - [ ] Persist vehicle sessions locally
 
@@ -26,4 +28,4 @@
 - [ ] NexPart ordering through Tekmetric where supported
 
 ## Guardrails
-No scraping licensed repair information. No vendor passwords or API secrets in source control. Exact specs are VERIFIED only from an authorized source. Parts orders and customer-facing estimates require human confirmation until explicitly designed otherwise.
+Simulated procedures are never marked verified. No scraping licensed repair information. No vendor passwords or API secrets in source control. Exact specs are VERIFIED only from an authorized source. Parts orders and customer-facing estimates require human confirmation.
