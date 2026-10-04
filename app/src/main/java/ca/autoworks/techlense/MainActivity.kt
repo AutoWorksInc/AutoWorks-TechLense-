@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
@@ -76,6 +77,10 @@ class MainActivity:ComponentActivity(){
   result.onSuccess{status->if(status==PermissionStatus.Granted) startGlassesSession() else _glassesStatus.value="Camera permission not granted"}
    .onFailure{error,_-> _glassesStatus.value="Camera permission error: "+error.description}
  }
+ private val microphonePermission=registerForActivityResult(Wearables.RequestPermissionContract()){result->
+  result.onSuccess{status->if(status==PermissionStatus.Granted) startHandsFreeSpeech() else _lastGlassesAction.value="Microphone permission not granted"}
+   .onFailure{error,_-> _lastGlassesAction.value="Microphone permission error: "+error.description}
+ }
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{
   MaterialTheme(colorScheme=lightColorScheme(primary=MekGreen,surface=Color.White,background=Workspace)){MekViewAlpha()}
  }}
@@ -115,20 +120,24 @@ class MainActivity:ComponentActivity(){
    .onFailure{error,_-> _lastGlassesAction.value="Capture button unavailable: "+error.description}
  }
  fun enableHandsFreeCommands(){
-  val session=deviceSession?:run{_lastGlassesAction.value="Start the glasses session first";return}
+  if(deviceSession==null){_lastGlassesAction.value="Start the glasses session first";return}
   lifecycleScope.launch{
    Wearables.checkPermissionStatus(Permission.MICROPHONE).onSuccess{status->
-    if(status!=PermissionStatus.Granted){_lastGlassesAction.value="Microphone permission required in Meta AI";return@onSuccess}
-    if(glassesSpeech!=null)return@onSuccess
-    session.addSpeech().onSuccess{speech->
-     glassesSpeech=speech
-     speechJob=lifecycleScope.launch{speech.transcriptions.collect{result->
-      if(result!=null && result.isFinal) handleGlassesCommand(result.text)
-     }}
-     speech.start().onSuccess{_lastGlassesAction.value="Hands-free commands listening"}.onFailure{error,_-> _lastGlassesAction.value="Speech failed: "+error.description}
-    }.onFailure{error,_-> _lastGlassesAction.value="Speech unavailable: "+error.description}
+    if(status==PermissionStatus.Granted) startHandsFreeSpeech()
+    else{_lastGlassesAction.value="Opening Meta AI for microphone permission…";microphonePermission.launch(Permission.MICROPHONE)}
    }.onFailure{error,_-> _lastGlassesAction.value="Microphone check failed: "+error.description}
   }
+ }
+ private fun startHandsFreeSpeech(){
+  val session=deviceSession?:run{_lastGlassesAction.value="Glasses session ended";return}
+  if(glassesSpeech!=null){_lastGlassesAction.value="Hands-free commands already listening";return}
+  session.addSpeech().onSuccess{speech->
+   glassesSpeech=speech
+   speechJob=lifecycleScope.launch{speech.transcriptions.collect{result->
+    if(result!=null && result.isFinal) handleGlassesCommand(result.text)
+   }}
+   speech.start().onSuccess{_lastGlassesAction.value="Hands-free commands listening"}.onFailure{error,_-> _lastGlassesAction.value="Speech failed: "+error.description}
+  }.onFailure{error,_-> _lastGlassesAction.value="Speech unavailable: "+error.description}
  }
  private fun handleGlassesCommand(text:String){
   val command=text.trim().lowercase()
@@ -220,13 +229,14 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
 @Composable private fun VehicleWorkspace(initial:DemoRepairSession,onBack:()->Unit,onSessionChange:(DemoRepairSession)->Unit){
  var s by remember(initial.roNumber){mutableStateOf(initial)}
  var tab by remember{mutableIntStateOf(0)}
+ BackHandler(onBack=onBack)
  val context=LocalContext.current
  val evidenceLaunchers=rememberEvidenceLaunchers(
   createUri={type->EvidenceCapture.newEvidenceUri(context,type)},
   onCaptured={type,uri->s=s.copy(evidence=s.evidence+InspectionEvidence((if(type==EvidenceMediaType.PHOTO)"photo-" else "video-")+(s.evidence.size+1),type,"Pixel camera "+type.name.lowercase()+" evidence",System.currentTimeMillis(),uri.toString(),false))}
  )
  DisposableEffect(s){onDispose{onSessionChange(s)}}
- Scaffold(containerColor=Workspace,floatingActionButton={FloatingActionButton(onClick={},containerColor=MekGreen,contentColor=Color.White,shape=CircleShape){Text("MV",fontWeight=FontWeight.Bold)}}){p->
+ Scaffold(containerColor=Workspace,floatingActionButton={FloatingActionButton(onClick={},containerColor=MekGreen,contentColor=Color.White,shape=CircleShape){Image(painter=painterResource(R.drawable.mekview_logo),contentDescription="MekView",modifier=Modifier.size(48.dp))}}){p->
   Column(Modifier.padding(p).fillMaxSize()){
    VehicleHeader(s,onBack)
    DiagnosticTabs(tab){tab=it}
