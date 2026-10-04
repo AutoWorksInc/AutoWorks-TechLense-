@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ca.autoworks.techlense.demo.*
@@ -55,13 +57,13 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
  val stages=listOf("Estimates","Work In Progress","Completed")
  val filtered=when(stage){0->jobs.filter{it.status=="Estimate"||it.status=="Diagnostic"};1->jobs.filter{it.status=="Work in Progress"};else->emptyList()}
  Column(Modifier.fillMaxSize().background(Workspace)){
-  Column(Modifier.fillMaxWidth().background(ShopCharcoal).padding(start=18.dp,top=18.dp,end=18.dp)){
+  Column(Modifier.fillMaxWidth().background(ShopCharcoal).padding(start=18.dp,top=52.dp,end=18.dp)){
    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
     Text("☰",color=Color.White,style=MaterialTheme.typography.headlineMedium)
     Row(Modifier.background(Color(0xFF3B4D52),RoundedCornerShape(10.dp)).padding(4.dp)){
      listOf("Job Board","My Work").forEachIndexed{i,t->Surface(color=if(boardTab==i)MekGreen else Color.Transparent,shape=RoundedCornerShape(8.dp),modifier=Modifier.clickable{boardTab=i}){Text(t,Modifier.padding(horizontal=20.dp,vertical=10.dp),color=Color.White,fontWeight=FontWeight.SemiBold)}}
     }
-    Text("MV",color=MekGreen,fontWeight=FontWeight.Bold)
+    Image(painter=painterResource(R.drawable.mekview_logo),contentDescription="MekView",modifier=Modifier.size(36.dp))
    }
    Spacer(Modifier.height(18.dp))
    Row(Modifier.fillMaxWidth()){stages.forEachIndexed{i,t->Column(Modifier.weight(1f).clickable{stage=i},horizontalAlignment=Alignment.CenterHorizontally){Text(t,color=if(stage==i)Color.White else Color.White.copy(alpha=.5f),fontWeight=if(stage==i)FontWeight.Bold else FontWeight.Normal,style=MaterialTheme.typography.labelLarge);Spacer(Modifier.height(10.dp));Box(Modifier.fillMaxWidth().height(4.dp).background(if(stage==i)MekGreen else Color.Transparent))}}}
