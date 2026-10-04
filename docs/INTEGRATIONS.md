@@ -1,11 +1,11 @@
-# TechLense integration architecture
+# MekView integration architecture
 
-TechLense is an orchestration layer. Vendor-specific code sits behind interchangeable connectors.
+MekView is an orchestration layer. Vendor-specific code sits behind interchangeable connectors.
 
 ## Shop management
 Primary target: **Tekmetric**.
 
-Responsibilities: active RO/vehicle context, inspection findings, estimate preparation, approval events and completed technician notes. TechLense should use authorized APIs/webhooks where available and must not store a user's Tekmetric password.
+Responsibilities: active RO/vehicle context, inspection findings, estimate preparation, approval events and completed technician notes. MekView should use authorized APIs/webhooks where available and must not store a user's Tekmetric password.
 
 ## Scan tools
 First target: **Autel**.
@@ -20,7 +20,7 @@ Responsibilities: TSBs, diagnostic procedures, repair procedures, wiring and spe
 ## Parts
 Primary path: **Tekmetric -> NexPart** when the shop uses Tekmetric's NexPart integration.
 
-Responsibilities: supplier results, shop cost, availability and ordering. TechLense may prepare an order, but v0.1 requires explicit human confirmation before submission.
+Responsibilities: supplier results, shop cost, availability and ordering. MekView may prepare an order, but v0.1 requires explicit human confirmation before submission.
 
 ## Closed-loop workflow
 RO loaded -> pre-scan -> repair-info research -> guided diagnosis -> document failure -> prepare estimate -> customer approval -> order parts -> guided repair -> post-scan -> confirmed fix -> close RO.
