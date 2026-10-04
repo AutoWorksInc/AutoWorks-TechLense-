@@ -1,6 +1,7 @@
 package ca.autoworks.techlense
 
 import android.os.Bundle
+import android.content.Intent
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
@@ -43,6 +44,7 @@ import com.meta.wearable.dat.inputs.types.InputEvent
 import com.meta.wearable.dat.inputs.types.InputsConfiguration
 import com.meta.wearable.dat.speech.Speech
 import com.meta.wearable.dat.speech.addSpeech
+import com.meta.wearable.dat.core.isVoiceInvocationsIntent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +68,7 @@ class MainActivity:ComponentActivity(){
  private var inputsJob:Job?=null
  private var speechJob:Job?=null
  private var glassesSpeech:Speech?=null
+ private var commandTimeoutJob:Job?=null
  private var pendingCameraStart=false
  private val _lastGlassesAction=MutableStateFlow("No capture yet")
  val lastGlassesAction:StateFlow<String> = _lastGlassesAction
@@ -78,12 +81,13 @@ class MainActivity:ComponentActivity(){
    .onFailure{error,_-> _glassesStatus.value="Camera permission error: "+error.description}
  }
  private val microphonePermission=registerForActivityResult(Wearables.RequestPermissionContract()){result->
-  result.onSuccess{status->if(status==PermissionStatus.Granted) startHandsFreeSpeech() else _lastGlassesAction.value="Microphone permission not granted"}
+  result.onSuccess{status->if(status==PermissionStatus.Granted) startTemporarySpeech() else _lastGlassesAction.value="Microphone permission not granted"}
    .onFailure{error,_-> _lastGlassesAction.value="Microphone permission error: "+error.description}
  }
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{
   MaterialTheme(colorScheme=lightColorScheme(primary=MekGreen,surface=Color.White,background=Workspace)){MekViewAlpha()}
- }}
+ };if(isVoiceInvocationsIntent(intent)) beginTemporaryListening()}
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);if(isVoiceInvocationsIntent(intent))beginTemporaryListening()}
  override fun onStart(){super.onStart();val required=arrayOf(Manifest.permission.BLUETOOTH,Manifest.permission.BLUETOOTH_CONNECT);if(required.all{ContextCompat.checkSelfPermission(this,it)==PackageManager.PERMISSION_GRANTED}) Wearables.initialize(this) else datPermissions.launch(required)}
 
  fun connectGlasses(){
@@ -96,7 +100,7 @@ class MainActivity:ComponentActivity(){
      if(state==DeviceSessionState.STARTED){
       _glassesStatus.value="Glasses connected"
       attachGlassesInputs(session)
-      requestMicrophoneAndStart()
+      _lastGlassesAction.value="Ready • say Hey Meta, start MekView"
      } else _glassesStatus.value="Glasses: "+state.name.lowercase().replaceFirstChar{it.uppercase()}
     }}
     session.start()
@@ -108,39 +112,37 @@ class MainActivity:ComponentActivity(){
    .onSuccess{inputs->inputsJob=lifecycleScope.launch{inputs.events.collect{event->if(event is InputEvent.Capture) requestPhotoCapture("Glasses button")}}}
    .onFailure{error,_-> _lastGlassesAction.value="Capture button unavailable: "+error.description}
  }
- private fun requestMicrophoneAndStart(){
+ private fun beginTemporaryListening(){
+  if(deviceSession==null){_lastGlassesAction.value="Connect glasses first";return}
   lifecycleScope.launch{
    Wearables.checkPermissionStatus(Permission.MICROPHONE).onSuccess{status->
-    if(status==PermissionStatus.Granted) startHandsFreeSpeech()
+    if(status==PermissionStatus.Granted) startTemporarySpeech()
     else{_lastGlassesAction.value="Opening Meta AI for microphone permission…";microphonePermission.launch(Permission.MICROPHONE)}
    }.onFailure{error,_-> _lastGlassesAction.value="Microphone check failed: "+error.description}
   }
  }
- private fun startHandsFreeSpeech(){
+ private fun startTemporarySpeech(){
   val session=deviceSession?:return
-  if(glassesSpeech!=null)return
+  if(glassesSpeech!=null){_lastGlassesAction.value="MekView is listening…";return}
   session.addSpeech().onSuccess{speech->
    glassesSpeech=speech
-   speechJob=lifecycleScope.launch{speech.transcriptions.collect{result->if(result!=null&&result.isFinal)handleGlassesCommand(result.text)}}
-   speech.start().onSuccess{_glassesStatus.value="Glasses connected • microphone listening";_lastGlassesAction.value="Ready for voice or capture button"}
-    .onFailure{error,_-> _lastGlassesAction.value="Speech failed: "+error.description}
+   speechJob=lifecycleScope.launch{speech.transcriptions.collect{result->
+    if(result!=null&&result.isFinal){handleGlassesCommand(result.text);stopTemporarySpeech()}
+   }}
+   speech.start().onSuccess{
+    _lastGlassesAction.value="MekView is listening…"
+    commandTimeoutJob?.cancel()
+    commandTimeoutJob=lifecycleScope.launch{kotlinx.coroutines.delay(10000);stopTemporarySpeech()}
+   }.onFailure{error,_-> _lastGlassesAction.value="Speech failed: "+error.description}
   }.onFailure{error,_-> _lastGlassesAction.value="Speech unavailable: "+error.description}
  }
- private var pendingPhotoSource:String?=null
- private fun requestPhotoCapture(source:String){
-  pendingPhotoSource=source
-  if(glassesCamera!=null){captureInspectionPhoto(source);return}
-  lifecycleScope.launch{
-   Wearables.checkPermissionStatus(Permission.CAMERA).onSuccess{status->
-    if(status==PermissionStatus.Granted) startCameraForPendingCapture()
-    else cameraPermission.launch(Permission.CAMERA)
-   }.onFailure{error,_-> _lastGlassesAction.value="Camera permission check failed: "+error.description}
-  }
- }
- private fun startCameraForPendingCapture(){
-  val session=deviceSession?:run{_lastGlassesAction.value="Connect glasses first";return}
-  _lastGlassesAction.value="Opening camera for capture…"
-  attachGlassesCamera(session)
+ private fun stopTemporarySpeech(){
+  commandTimeoutJob?.cancel();commandTimeoutJob=null
+  glassesSpeech?.stop()
+  speechJob?.cancel();speechJob=null
+  deviceSession?.removeSpeech()
+  glassesSpeech=null
+  if(deviceSession!=null)_lastGlassesAction.value="Ready • say Hey Meta, start MekView"
  }
  private fun handleGlassesCommand(text:String){
   val command=text.trim().lowercase()
@@ -175,7 +177,7 @@ class MainActivity:ComponentActivity(){
  }
  fun stopGlassesCamera(){
   glassesCamera?.stop();glassesCamera=null;deviceSession?.stop();deviceSession=null
-  sessionJob?.cancel();streamJob?.cancel();inputsJob?.cancel();inputsJob=null;speechJob?.cancel();speechJob=null;glassesSpeech=null;_glassesStatus.value="Camera session stopped"
+  sessionJob?.cancel();streamJob?.cancel();inputsJob?.cancel();inputsJob=null;commandTimeoutJob?.cancel();commandTimeoutJob=null;speechJob?.cancel();speechJob=null;glassesSpeech=null;_glassesStatus.value="Glasses disconnected"
  }
  override fun onDestroy(){stopGlassesCamera();super.onDestroy()}
 }
