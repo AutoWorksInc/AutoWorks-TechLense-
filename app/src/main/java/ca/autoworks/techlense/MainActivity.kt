@@ -1,5 +1,4 @@
 package ca.autoworks.techlense
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,72 +8,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import ca.autoworks.techlense.model.EvidenceSource
-import ca.autoworks.techlense.model.VehicleSession
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { TechLenseApp() } }
-    }
-}
-
+import ca.autoworks.techlense.demo.DemoData
+import ca.autoworks.techlense.demo.DemoRepairSession
+class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{MaterialTheme{TechLenseAlpha()}}}}
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TechLenseApp() {
-    var vehicle by remember { mutableStateOf(VehicleSession()) }
-    var mode by remember { mutableStateOf("DIAGNOSE") }
-    Scaffold(topBar = { TopAppBar(title = { Text("AutoWorks TechLense") }) }) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).padding(16.dp).fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Text("TECHNICIAN COPILOT", style = MaterialTheme.typography.labelLarge)
-                Text("Pixel + Ray-Ban Meta Gen 2")
-            }
-            item {
-                ElevatedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Current vehicle", style = MaterialTheme.typography.titleMedium)
-                        Field("VIN", vehicle.vin) { vehicle = vehicle.copy(vin = it) }
-                        Field("Year", vehicle.year) { vehicle = vehicle.copy(year = it) }
-                        Field("Make", vehicle.make) { vehicle = vehicle.copy(make = it) }
-                        Field("Model", vehicle.model) { vehicle = vehicle.copy(model = it) }
-                        Field("Engine", vehicle.engine) { vehicle = vehicle.copy(engine = it) }
-                        Field("Mileage (km)", vehicle.mileageKm) { vehicle = vehicle.copy(mileageKm = it) }
-                        Field("Customer complaint", vehicle.complaint) { vehicle = vehicle.copy(complaint = it) }
-                        Field("DTCs", vehicle.dtcs) { vehicle = vehicle.copy(dtcs = it) }
-                    }
-                }
-            }
-            item {
-                Text("Mode", style = MaterialTheme.typography.titleMedium)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("DIAGNOSE", "LOOK / IDENTIFY", "PROCEDURE", "INSPECTION", "NOTES").forEach { choice ->
-                        Button(onClick = { mode = choice }, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (mode == choice) "• " + choice else choice)
-                        }
-                    }
-                }
-            }
-            item {
-                ElevatedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Source guardrails", style = MaterialTheme.typography.titleMedium)
-                        EvidenceSource.entries.forEach { source -> Text("• " + source.label) }
-                        Text("Critical specs are never marked verified unless supplied by an authorized repair-information source.")
-                    }
-                }
-            }
-            item { Text("Glasses: integration foundation installed") }
-            item { Text("v0.1.0 • development build", style = MaterialTheme.typography.labelMedium) }
-        }
-    }
-}
-
-@Composable
-private fun Field(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(), singleLine = label != "Customer complaint")
+@Composable private fun TechLenseAlpha(){
+ var session by remember{mutableStateOf(DemoRepairSession())}
+ Scaffold(topBar={TopAppBar(title={Text("AutoWorks TechLense")})}){padding->
+  LazyColumn(modifier=Modifier.padding(padding).padding(16.dp).fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)){
+   item{Text("ALPHA 0.1 • TECHNICIAN WORKSPACE",style=MaterialTheme.typography.labelLarge);Text("Closed-loop repair prototype")}
+   item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){Text(session.roNumber,style=MaterialTheme.typography.titleLarge);Text(session.vehicle,style=MaterialTheme.typography.titleMedium);Text("VIN: "+session.vin);Text(session.mileage);HorizontalDivider(Modifier.padding(vertical=4.dp));Text("Customer concern",style=MaterialTheme.typography.labelLarge);Text(session.concern)}}}
+   item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("Connections",style=MaterialTheme.typography.titleMedium);Text("Tekmetric: SIMULATED");Text("Autel: SIMULATED");Text("Repair information: SIMULATED");Text("NexPart via Tekmetric: SIMULATED");Text("Ray-Ban Meta: integration foundation installed")}}}
+   item{Button(onClick={session=session.copy(dtcs=DemoData.scanResults)},modifier=Modifier.fillMaxWidth()){Text(if(session.dtcs.isEmpty())"SCAN VEHICLE" else "RESCAN VEHICLE")}}
+   if(session.dtcs.isNotEmpty()){
+    item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("AUTEL • SCAN TOOL DATA",style=MaterialTheme.typography.titleMedium);session.dtcs.forEach{Text(it.code+" — "+it.description)};Text("Source: simulated scan connector",style=MaterialTheme.typography.labelSmall)}}}
+    item{Button(onClick={session=session.copy(researchSummary="Relevant diagnostic information found. Verify the fault with scan data and directed testing before replacing components.")},modifier=Modifier.fillMaxWidth()){Text("RESEARCH DTCs")}}
+   }
+   session.researchSummary?.let{summary->item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("REPAIR INFORMATION",style=MaterialTheme.typography.titleMedium);Text(summary);Text("SIMULATED — NOT VERIFIED REPAIR INFORMATION",style=MaterialTheme.typography.labelLarge)}}};item{Button(onClick={session=session.copy(finding="Technician confirmed a failed component after directed testing. Photo/video evidence will attach here.")},modifier=Modifier.fillMaxWidth()){Text("DOCUMENT FAILED COMPONENT")}}}
+   session.finding?.let{finding->item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("TECHNICIAN FINDING",style=MaterialTheme.typography.titleMedium);Text(finding)}}};item{Button(onClick={session=session.copy(estimateStatus="Estimate draft prepared for service-advisor review.")},modifier=Modifier.fillMaxWidth()){Text("PREPARE CLIENT QUOTE")}}}
+   session.estimateStatus?.let{status->item{ElevatedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("TEKMETRIC • ESTIMATE",style=MaterialTheme.typography.titleMedium);Text(status);Text("No order or customer communication has been submitted.",style=MaterialTheme.typography.labelMedium)}}}}
+   item{Text("Simulation is intentionally labeled. Vendor data is VERIFIED only after authorized integrations are connected.",style=MaterialTheme.typography.bodySmall)}
+  }
+ }
 }
