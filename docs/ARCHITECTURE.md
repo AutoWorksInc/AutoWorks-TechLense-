@@ -1,4 +1,4 @@
-# TechLense architecture
+# MekView architecture
 
 ## v0.1 flow
 Ray-Ban Meta Gen 2 -> Meta Wearables DAT -> Pixel app -> vehicle session -> AI service boundary -> sourced response -> audio/UI.
