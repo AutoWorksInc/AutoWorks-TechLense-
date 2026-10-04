@@ -57,7 +57,7 @@ private val Workspace=Color(0xFFF3F4F4)
 private val Muted=Color(0xFF667176)
 
 class MainActivity:ComponentActivity(){
- private val _glassesStatus=MutableStateFlow("Ready to start camera session")
+ private val _glassesStatus=MutableStateFlow("Ready to connect glasses")
  val glassesStatus:StateFlow<String> = _glassesStatus
  private var deviceSession:DeviceSession?=null
  private var glassesCamera:Camera?=null
@@ -74,7 +74,7 @@ class MainActivity:ComponentActivity(){
   if(grants.values.all{it}) Wearables.initialize(this)
  }
  private val cameraPermission=registerForActivityResult(Wearables.RequestPermissionContract()){result->
-  result.onSuccess{status->if(status==PermissionStatus.Granted) startGlassesSession() else _glassesStatus.value="Camera permission not granted"}
+  result.onSuccess{status->if(status==PermissionStatus.Granted) startCameraForPendingCapture() else _lastGlassesAction.value="Camera permission not granted"}
    .onFailure{error,_-> _glassesStatus.value="Camera permission error: "+error.description}
  }
  private val microphonePermission=registerForActivityResult(Wearables.RequestPermissionContract()){result->
@@ -86,41 +86,29 @@ class MainActivity:ComponentActivity(){
  }}
  override fun onStart(){super.onStart();val required=arrayOf(Manifest.permission.BLUETOOTH,Manifest.permission.BLUETOOTH_CONNECT);if(required.all{ContextCompat.checkSelfPermission(this,it)==PackageManager.PERMISSION_GRANTED}) Wearables.initialize(this) else datPermissions.launch(required)}
 
- fun beginGlassesCamera(){
-  _glassesStatus.value="Checking glasses camera permission…"
-  lifecycleScope.launch{
-   Wearables.checkPermissionStatus(Permission.CAMERA)
-    .onSuccess{status->if(status==PermissionStatus.Granted) startGlassesSession() else cameraPermission.launch(Permission.CAMERA)}
-    .onFailure{error,_-> _glassesStatus.value="Permission check failed: "+error.description}
-  }
- }
- private fun startGlassesSession(){
-  if(deviceSession!=null){_glassesStatus.value="Glasses session already active";return}
-  _glassesStatus.value="Starting glasses session…"
+ fun connectGlasses(){
+  if(deviceSession!=null){_glassesStatus.value="Glasses connected • microphone listening";return}
+  _glassesStatus.value="Connecting glasses…"
   Wearables.createSession(AutoDeviceSelector())
    .onSuccess{session->
     deviceSession=session
-    sessionJob=lifecycleScope.launch{
-     session.state.collect{state->
-      _glassesStatus.value="Session: "+state.name.lowercase().replaceFirstChar{it.uppercase()}
-      if(state==DeviceSessionState.STARTED){
-       if(glassesCamera==null) attachGlassesCamera(session)
-       attachGlassesInputs(session)
-      }
-     }
-    }
+    sessionJob=lifecycleScope.launch{session.state.collect{state->
+     if(state==DeviceSessionState.STARTED){
+      _glassesStatus.value="Glasses connected"
+      attachGlassesInputs(session)
+      requestMicrophoneAndStart()
+     } else _glassesStatus.value="Glasses: "+state.name.lowercase().replaceFirstChar{it.uppercase()}
+    }}
     session.start()
-   }
-   .onFailure{error,_-> _glassesStatus.value="Session failed: "+error.description}
+   }.onFailure{error,_-> _glassesStatus.value="Glasses connection failed: "+error.description}
  }
  private fun attachGlassesInputs(session:DeviceSession){
   if(inputsJob!=null)return
   session.addInputs(InputsConfiguration(consumeBack=false))
-   .onSuccess{inputs->inputsJob=lifecycleScope.launch{inputs.events.collect{event->if(event is InputEvent.Capture) captureInspectionPhoto("Glasses button")}}}
+   .onSuccess{inputs->inputsJob=lifecycleScope.launch{inputs.events.collect{event->if(event is InputEvent.Capture) requestPhotoCapture("Glasses button")}}}
    .onFailure{error,_-> _lastGlassesAction.value="Capture button unavailable: "+error.description}
  }
- fun enableHandsFreeCommands(){
-  if(deviceSession==null){_lastGlassesAction.value="Start the glasses session first";return}
+ private fun requestMicrophoneAndStart(){
   lifecycleScope.launch{
    Wearables.checkPermissionStatus(Permission.MICROPHONE).onSuccess{status->
     if(status==PermissionStatus.Granted) startHandsFreeSpeech()
@@ -129,21 +117,36 @@ class MainActivity:ComponentActivity(){
   }
  }
  private fun startHandsFreeSpeech(){
-  val session=deviceSession?:run{_lastGlassesAction.value="Glasses session ended";return}
-  if(glassesSpeech!=null){_lastGlassesAction.value="Hands-free commands already listening";return}
+  val session=deviceSession?:return
+  if(glassesSpeech!=null)return
   session.addSpeech().onSuccess{speech->
    glassesSpeech=speech
-   speechJob=lifecycleScope.launch{speech.transcriptions.collect{result->
-    if(result!=null && result.isFinal) handleGlassesCommand(result.text)
-   }}
-   speech.start().onSuccess{_lastGlassesAction.value="Hands-free commands listening"}.onFailure{error,_-> _lastGlassesAction.value="Speech failed: "+error.description}
+   speechJob=lifecycleScope.launch{speech.transcriptions.collect{result->if(result!=null&&result.isFinal)handleGlassesCommand(result.text)}}
+   speech.start().onSuccess{_glassesStatus.value="Glasses connected • microphone listening";_lastGlassesAction.value="Ready for voice or capture button"}
+    .onFailure{error,_-> _lastGlassesAction.value="Speech failed: "+error.description}
   }.onFailure{error,_-> _lastGlassesAction.value="Speech unavailable: "+error.description}
+ }
+ private var pendingPhotoSource:String?=null
+ private fun requestPhotoCapture(source:String){
+  pendingPhotoSource=source
+  if(glassesCamera!=null){captureInspectionPhoto(source);return}
+  lifecycleScope.launch{
+   Wearables.checkPermissionStatus(Permission.CAMERA).onSuccess{status->
+    if(status==PermissionStatus.Granted) startCameraForPendingCapture()
+    else cameraPermission.launch(Permission.CAMERA)
+   }.onFailure{error,_-> _lastGlassesAction.value="Camera permission check failed: "+error.description}
+  }
+ }
+ private fun startCameraForPendingCapture(){
+  val session=deviceSession?:run{_lastGlassesAction.value="Connect glasses first";return}
+  _lastGlassesAction.value="Opening camera for capture…"
+  attachGlassesCamera(session)
  }
  private fun handleGlassesCommand(text:String){
   val command=text.trim().lowercase()
   when{
-   command.contains("take")&&command.contains("photo")->captureInspectionPhoto("Voice")
-   command.contains("take")&&command.contains("picture")->captureInspectionPhoto("Voice")
+   command.contains("take")&&command.contains("photo")->requestPhotoCapture("Voice")
+   command.contains("take")&&command.contains("picture")->requestPhotoCapture("Voice")
    command.contains("scan")&&command.contains("vin")->_lastGlassesAction.value="VIN scan command recognized • capture/OCR is next"
    command.contains("start")&&command.contains("video")->_lastGlassesAction.value="Start video command recognized • recorder is next"
    command.contains("stop")&&command.contains("video")->_lastGlassesAction.value="Stop video command recognized"
@@ -165,7 +168,7 @@ class MainActivity:ComponentActivity(){
   session.addCamera(StreamConfiguration(videoQuality=VideoQuality.MEDIUM,frameRate=15))
    .onSuccess{camera->
     pendingCameraStart=false;glassesCamera=camera
-    streamJob=lifecycleScope.launch{camera.stream.state.collect{state->_glassesStatus.value=when(state){StreamState.STREAMING->"POV camera streaming";StreamState.PAUSED->"POV camera paused";else->"Camera: "+state.name.lowercase().replaceFirstChar{it.uppercase()}}}}
+    streamJob=lifecycleScope.launch{camera.stream.state.collect{state->_glassesStatus.value=when(state){StreamState.STREAMING->{pendingPhotoSource?.let{source->pendingPhotoSource=null;captureInspectionPhoto(source)};"Camera active for capture"};StreamState.PAUSED->"POV camera paused";else->"Camera: "+state.name.lowercase().replaceFirstChar{it.uppercase()}}}}
     camera.stream.start().onFailure{error,_-> _glassesStatus.value="Camera stream failed: "+error.description}
    }
    .onFailure{error,_->pendingCameraStart=false;_glassesStatus.value="Camera setup failed: "+error.description}
@@ -290,12 +293,10 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
   if(registration!=RegistrationState.REGISTERED) Button(onClick={activity?.let{Wearables.startRegistration(it)}},Modifier.fillMaxWidth()){Text("CONNECT META GLASSES")}
   else if(devices.isNotEmpty()){
    Text(cameraStatus,style=MaterialTheme.typography.bodySmall,color=if(cameraStatus=="POV camera streaming")MekGreen else Muted)
-   Button(onClick={if(cameraActive) activity?.stopGlassesCamera() else activity?.beginGlassesCamera()},Modifier.fillMaxWidth()){Text(if(cameraActive)"END GLASSES SESSION" else "START GLASSES SESSION")}
-   if(cameraStatus=="POV camera streaming"){
-    Button(onClick={activity?.enableHandsFreeCommands()},Modifier.fillMaxWidth()){Text("ENABLE HANDS-FREE COMMANDS")}
-    Text("Capture button: photo • Voice: take photo / scan VIN / start video",style=MaterialTheme.typography.bodySmall,color=Muted)
+   if(activity?.glassesStatus?.value?.contains("connected",ignoreCase=true)==true){
+    Text("Capture button or voice can activate the camera when needed.",style=MaterialTheme.typography.bodySmall,color=Muted)
     Text(lastAction,style=MaterialTheme.typography.bodySmall,color=Muted)
-   }
+   } else Button(onClick={activity?.connectGlasses()},Modifier.fillMaxWidth()){Text("CONNECT GLASSES")}
   }
  }}
 }
