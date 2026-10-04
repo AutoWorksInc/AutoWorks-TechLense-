@@ -33,34 +33,75 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable private fun MekViewAlpha(){
- var s by remember{mutableStateOf(DemoRepairSession())}
+ var selected by remember{mutableStateOf<DemoRepairSession?>(null)}
+ if(selected==null){
+  JobBoard{selected=it}
+ } else {
+  VehicleWorkspace(selected!!,onBack={selected=null},onSessionChange={selected=it})
+ }
+}
+
+private data class DemoJob(val session:DemoRepairSession,val customer:String,val status:String,val dropOff:String="Drop Off")
+
+@Composable private fun JobBoard(onSelect:(DemoRepairSession)->Unit){
+ val jobs=remember{listOf(
+  DemoJob(DemoRepairSession(),"Alex Martin","Diagnostic"),
+  DemoJob(DemoRepairSession(roNumber="RO #18427",vehicle="2018 Chevrolet Silverado 1500",vin="3GCUKREC0JG000027",mileage="154,200 km",concern="Brake vibration and front-end noise"),"Jordan Lee","Work in Progress"),
+  DemoJob(DemoRepairSession(roNumber="RO #18419",vehicle="2021 Toyota RAV4",vin="2T3R1RFV8MW000019",mileage="82,100 km",concern="Maintenance inspection and tire concern"),"Taylor Chen","Estimate"),
+  DemoJob(DemoRepairSession(roNumber="RO #18411",vehicle="2017 Honda CR-V",vin="2HKRW2H80HH000011",mileage="139,800 km",concern="A/C not cooling"),"Morgan Davis","Estimate")
+ )}
+ var boardTab by remember{mutableIntStateOf(0)}
+ var stage by remember{mutableIntStateOf(0)}
+ val stages=listOf("Estimates","Work In Progress","Completed")
+ val filtered=when(stage){0->jobs.filter{it.status=="Estimate"||it.status=="Diagnostic"};1->jobs.filter{it.status=="Work in Progress"};else->emptyList()}
+ Column(Modifier.fillMaxSize().background(Workspace)){
+  Column(Modifier.fillMaxWidth().background(ShopCharcoal).padding(top=18.dp,horizontal=18.dp)){
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
+    Text("☰",color=Color.White,style=MaterialTheme.typography.headlineMedium)
+    Row(Modifier.background(Color(0xFF3B4D52),RoundedCornerShape(10.dp)).padding(4.dp)){
+     listOf("Job Board","My Work").forEachIndexed{i,t->Surface(color=if(boardTab==i)MekGreen else Color.Transparent,shape=RoundedCornerShape(8.dp),modifier=Modifier.clickable{boardTab=i}){Text(t,Modifier.padding(horizontal=20.dp,vertical=10.dp),color=Color.White,fontWeight=FontWeight.SemiBold)}}
+    }
+    Text("MV",color=MekGreen,fontWeight=FontWeight.Bold)
+   }
+   Spacer(Modifier.height(18.dp))
+   Row(Modifier.fillMaxWidth()){stages.forEachIndexed{i,t->Column(Modifier.weight(1f).clickable{stage=i},horizontalAlignment=Alignment.CenterHorizontally){Text(t,color=if(stage==i)Color.White else Color.White.copy(alpha=.5f),fontWeight=if(stage==i)FontWeight.Bold else FontWeight.Normal,style=MaterialTheme.typography.labelLarge);Spacer(Modifier.height(10.dp));Box(Modifier.fillMaxWidth().height(4.dp).background(if(stage==i)MekGreen else Color.Transparent))}}}
+  }
+  Row(Modifier.fillMaxWidth().background(Color.White).padding(14.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+   AssistChip(onClick={},label={Text("Search")});AssistChip(onClick={},label={Text("Technician ▾")});AssistChip(onClick={},label={Text("RO Status ▾")})
+  }
+  if(filtered.isEmpty()) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text("No jobs in this stage",color=Muted)}
+  else LazyColumn(Modifier.fillMaxSize().padding(14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+   items(filtered.size){i->val j=filtered[i];Card(Modifier.fillMaxWidth().clickable{onSelect(j.session)},colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(j.session.vehicle,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);Text(j.session.roNumber,color=Muted,fontWeight=FontWeight.SemiBold)}
+    Text(j.dropOff+"  •  "+j.customer,color=Muted)
+    Text(j.session.concern,maxLines=2,style=MaterialTheme.typography.bodyMedium)
+    Surface(color=if(j.status=="Estimate")Color(0xFFE8F0FF) else MekGreen.copy(alpha=.14f),shape=RoundedCornerShape(6.dp)){Text(j.status,Modifier.padding(horizontal=10.dp,vertical=5.dp),color=ShopCharcoal,fontWeight=FontWeight.SemiBold)}
+   }}}
+  }
+ }
+}
+
+@Composable private fun VehicleWorkspace(initial:DemoRepairSession,onBack:()->Unit,onSessionChange:(DemoRepairSession)->Unit){
+ var s by remember(initial.roNumber){mutableStateOf(initial)}
  var tab by remember{mutableIntStateOf(0)}
  val context=LocalContext.current
  val evidenceLaunchers=rememberEvidenceLaunchers(
   createUri={type->EvidenceCapture.newEvidenceUri(context,type)},
   onCaptured={type,uri->s=s.copy(evidence=s.evidence+InspectionEvidence((if(type==EvidenceMediaType.PHOTO)"photo-" else "video-")+(s.evidence.size+1),type,"Pixel camera "+type.name.lowercase()+" evidence",System.currentTimeMillis(),uri.toString(),false))}
  )
- Scaffold(
-  containerColor=Workspace,
-  floatingActionButton={FloatingActionButton(onClick={},containerColor=MekGreen,contentColor=Color.White,shape=CircleShape){Text("MV",fontWeight=FontWeight.Bold)}}
- ){p->
+ DisposableEffect(s){onDispose{onSessionChange(s)}}
+ Scaffold(containerColor=Workspace,floatingActionButton={FloatingActionButton(onClick={},containerColor=MekGreen,contentColor=Color.White,shape=CircleShape){Text("MV",fontWeight=FontWeight.Bold)}}){p->
   Column(Modifier.padding(p).fillMaxSize()){
-   VehicleHeader(s)
+   VehicleHeader(s,onBack)
    DiagnosticTabs(tab){tab=it}
-   when(tab){
-    0->Overview(s)
-    1->ScanScreen(s){s=it}
-    2->DiagnosisScreen(s,{s=it},evidenceLaunchers)
-    3->RepairScreen(s){s=it}
-    else->VerifyScreen(s)
-   }
+   when(tab){0->Overview(s);1->ScanScreen(s){s=it};2->DiagnosisScreen(s,{s=it},evidenceLaunchers);3->RepairScreen(s){s=it};else->VerifyScreen(s)}
   }
  }
 }
 
-@Composable private fun VehicleHeader(s:DemoRepairSession){
+@Composable private fun VehicleHeader(s:DemoRepairSession,onBack:()->Unit){
  Column(Modifier.fillMaxWidth().background(ShopCharcoal).padding(horizontal=20.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("‹",color=Color.White,style=MaterialTheme.typography.headlineMedium);Text(s.roNumber,color=Color.White,fontWeight=FontWeight.Bold);Text("MekView",color=MekGreen,fontWeight=FontWeight.Bold)}
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("‹",Modifier.clickable{onBack()},color=Color.White,style=MaterialTheme.typography.headlineMedium);Text(s.roNumber,color=Color.White,fontWeight=FontWeight.Bold);Text("MekView",color=MekGreen,fontWeight=FontWeight.Bold)}
   Text(s.vehicle,color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
   Text(s.concern,color=Color.White.copy(alpha=.82f),style=MaterialTheme.typography.bodyMedium)
   Surface(color=MekGreen.copy(alpha=.18f),shape=RoundedCornerShape(6.dp)){Text("DIAGNOSTIC SESSION",Modifier.padding(horizontal=10.dp,vertical=5.dp),color=Color.White,fontWeight=FontWeight.SemiBold)}
