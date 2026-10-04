@@ -7,5 +7,5 @@ dependencyResolutionManagement {
         maven { url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android") }
     }
 }
-rootProject.name = "AutoWorksTechLense"
+rootProject.name = "MekView"
 include(":app")
