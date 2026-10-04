@@ -138,8 +138,8 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
   item{Card(Modifier.fillMaxWidth()){Text(s.concern,Modifier.padding(18.dp),style=MaterialTheme.typography.bodyLarge)}}
   item{SectionTitle("Diagnostic progress")}
   item{InfoCard("Scan",if(s.dtcs.isEmpty())"Not started" else s.dtcs.size.toString()+" DTC(s) found","Evidence",s.evidence.size.toString()+" item(s)")}
-  item{GlassesCard()
-  item{Text("Tekmetric • Autel • Repair information are simulated in this alpha.",color=Muted,style=MaterialTheme.typography.bodySmall)}}
+  item{GlassesCard()}
+  item{Text("Tekmetric • Autel • Repair information are simulated in this alpha.",color=Muted,style=MaterialTheme.typography.bodySmall)}
  }
 }
 
