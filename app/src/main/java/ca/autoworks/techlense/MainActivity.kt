@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,20 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.RegistrationState
+import com.meta.wearable.dat.core.types.Permission
+import com.meta.wearable.dat.core.types.PermissionStatus
+import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
+import com.meta.wearable.dat.core.session.DeviceSession
+import com.meta.wearable.dat.core.session.DeviceSessionState
+import com.meta.wearable.dat.camera.Camera
+import com.meta.wearable.dat.camera.addCamera
+import com.meta.wearable.dat.camera.types.StreamConfiguration
+import com.meta.wearable.dat.camera.types.StreamState
+import com.meta.wearable.dat.camera.types.VideoQuality
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import ca.autoworks.techlense.demo.*
 import ca.autoworks.techlense.diagnostics.*
 import ca.autoworks.techlense.evidence.*
@@ -35,13 +50,66 @@ private val Workspace=Color(0xFFF3F4F4)
 private val Muted=Color(0xFF667176)
 
 class MainActivity:ComponentActivity(){
+ private val _glassesStatus=MutableStateFlow("Ready to start camera session")
+ val glassesStatus:StateFlow<String> = _glassesStatus
+ private var deviceSession:DeviceSession?=null
+ private var glassesCamera:Camera?=null
+ private var sessionJob:Job?=null
+ private var streamJob:Job?=null
+ private var pendingCameraStart=false
+
  private val datPermissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){grants->
   if(grants.values.all{it}) Wearables.initialize(this)
+ }
+ private val cameraPermission=registerForActivityResult(Wearables.RequestPermissionContract()){result->
+  result.onSuccess{status->if(status==PermissionStatus.Granted) startGlassesSession() else _glassesStatus.value="Camera permission not granted"}
+   .onFailure{error,_-> _glassesStatus.value="Camera permission error: "+error.description}
  }
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{
   MaterialTheme(colorScheme=lightColorScheme(primary=MekGreen,surface=Color.White,background=Workspace)){MekViewAlpha()}
  }}
  override fun onStart(){super.onStart();val required=arrayOf(Manifest.permission.BLUETOOTH,Manifest.permission.BLUETOOTH_CONNECT);if(required.all{ContextCompat.checkSelfPermission(this,it)==PackageManager.PERMISSION_GRANTED}) Wearables.initialize(this) else datPermissions.launch(required)}
+
+ fun beginGlassesCamera(){
+  _glassesStatus.value="Checking glasses camera permission…"
+  lifecycleScope.launch{
+   Wearables.checkPermissionStatus(Permission.CAMERA)
+    .onSuccess{status->if(status==PermissionStatus.Granted) startGlassesSession() else cameraPermission.launch(Permission.CAMERA)}
+    .onFailure{error,_-> _glassesStatus.value="Permission check failed: "+error.description}
+  }
+ }
+ private fun startGlassesSession(){
+  if(deviceSession!=null){_glassesStatus.value="Glasses session already active";return}
+  _glassesStatus.value="Starting glasses session…"
+  Wearables.createSession(AutoDeviceSelector())
+   .onSuccess{session->
+    deviceSession=session
+    sessionJob=lifecycleScope.launch{
+     session.state.collect{state->
+      _glassesStatus.value="Session: "+state.name.lowercase().replaceFirstChar{it.uppercase()}
+      if(state==DeviceSessionState.STARTED && glassesCamera==null) attachGlassesCamera(session)
+     }
+    }
+    session.start()
+   }
+   .onFailure{error,_-> _glassesStatus.value="Session failed: "+error.description}
+ }
+ private fun attachGlassesCamera(session:DeviceSession){
+  if(pendingCameraStart||glassesCamera!=null)return
+  pendingCameraStart=true
+  session.addCamera(StreamConfiguration(videoQuality=VideoQuality.MEDIUM,frameRate=15))
+   .onSuccess{camera->
+    pendingCameraStart=false;glassesCamera=camera
+    streamJob=lifecycleScope.launch{camera.stream.state.collect{state->_glassesStatus.value=when(state){StreamState.STREAMING->"POV camera streaming";StreamState.PAUSED->"POV camera paused";else->"Camera: "+state.name.lowercase().replaceFirstChar{it.uppercase()}}}}
+    camera.stream.start().onFailure{error,_-> _glassesStatus.value="Camera stream failed: "+error.description}
+   }
+   .onFailure{error,_->pendingCameraStart=false;_glassesStatus.value="Camera setup failed: "+error.description}
+ }
+ fun stopGlassesCamera(){
+  glassesCamera?.stop();glassesCamera=null;deviceSession?.stop();deviceSession=null
+  sessionJob?.cancel();streamJob?.cancel();_glassesStatus.value="Camera session stopped"
+ }
+ override fun onDestroy(){stopGlassesCamera();super.onDestroy()}
 }
 
 @Composable private fun MekViewAlpha(){
@@ -147,11 +215,16 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
  val activity=LocalContext.current as? MainActivity
  val registration by Wearables.registrationState.collectAsState()
  val devices by Wearables.devices.collectAsState()
+ val cameraStatus by (activity?.glassesStatus?:MutableStateFlow("Unavailable")).collectAsState()
+ val cameraActive=cameraStatus.contains("streaming",ignoreCase=true)||cameraStatus.startsWith("Camera:")||cameraStatus.startsWith("Session:")
  Card(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
   Text("MekView Glasses",fontWeight=FontWeight.Bold)
   Text(when(registration){RegistrationState.REGISTERED->if(devices.isEmpty()) "Registered • No glasses detected" else "Registered • "+devices.size+" device(s) detected";else->"Not registered with Meta AI"},color=if(registration==RegistrationState.REGISTERED)MekGreen else Muted)
   if(registration!=RegistrationState.REGISTERED) Button(onClick={activity?.let{Wearables.startRegistration(it)}},Modifier.fillMaxWidth()){Text("CONNECT META GLASSES")}
-  else Text("Connection layer ready. Camera session is the next milestone.",style=MaterialTheme.typography.bodySmall,color=Muted)
+  else if(devices.isNotEmpty()){
+   Text(cameraStatus,style=MaterialTheme.typography.bodySmall,color=if(cameraStatus=="POV camera streaming")MekGreen else Muted)
+   Button(onClick={if(cameraActive){{activity?.stopGlassesCamera()}}else{{activity?.beginGlassesCamera()}}},Modifier.fillMaxWidth()){Text(if(cameraActive)"STOP CAMERA SESSION" else "START POV CAMERA")}
+  }
  }}
 }
 
