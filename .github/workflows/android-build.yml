@@ -20,11 +20,11 @@ jobs:
           gradle-version: '8.13'
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
-      - name: Upload TechLense Alpha APK
+      - name: Upload MekView Alpha APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: TechLense-Alpha-debug
+          name: MekView-Alpha-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
