@@ -55,7 +55,7 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
  val stages=listOf("Estimates","Work In Progress","Completed")
  val filtered=when(stage){0->jobs.filter{it.status=="Estimate"||it.status=="Diagnostic"};1->jobs.filter{it.status=="Work in Progress"};else->emptyList()}
  Column(Modifier.fillMaxSize().background(Workspace)){
-  Column(Modifier.fillMaxWidth().background(ShopCharcoal).padding(top=18.dp,horizontal=18.dp)){
+  Column(Modifier.fillMaxWidth().background(ShopCharcoal).padding(start=18.dp,top=18.dp,end=18.dp)){
    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
     Text("☰",color=Color.White,style=MaterialTheme.typography.headlineMedium)
     Row(Modifier.background(Color(0xFF3B4D52),RoundedCornerShape(10.dp)).padding(4.dp)){
