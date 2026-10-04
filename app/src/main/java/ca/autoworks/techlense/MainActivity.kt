@@ -223,7 +223,7 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
   if(registration!=RegistrationState.REGISTERED) Button(onClick={activity?.let{Wearables.startRegistration(it)}},Modifier.fillMaxWidth()){Text("CONNECT META GLASSES")}
   else if(devices.isNotEmpty()){
    Text(cameraStatus,style=MaterialTheme.typography.bodySmall,color=if(cameraStatus=="POV camera streaming")MekGreen else Muted)
-   Button(onClick={if(cameraActive){{activity?.stopGlassesCamera()}}else{{activity?.beginGlassesCamera()}}},Modifier.fillMaxWidth()){Text(if(cameraActive)"STOP CAMERA SESSION" else "START POV CAMERA")}
+   Button(onClick={if(cameraActive) activity?.stopGlassesCamera() else activity?.beginGlassesCamera()},Modifier.fillMaxWidth()){Text(if(cameraActive)"STOP CAMERA SESSION" else "START POV CAMERA")}
   }
  }}
 }
