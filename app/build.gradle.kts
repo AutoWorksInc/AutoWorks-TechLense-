@@ -25,5 +25,6 @@ dependencies {
     implementation("com.meta.wearable:mwdat-core:1.0.0")
     implementation("com.meta.wearable:mwdat-camera:1.0.0")
     implementation("com.meta.wearable:mwdat-speech:1.0.0")
+    implementation("com.meta.wearable:mwdat-inputs:1.0.0")
     debugImplementation("com.meta.wearable:mwdat-mockdevice:1.0.0")
 }
