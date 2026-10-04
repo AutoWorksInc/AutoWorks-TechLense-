@@ -1,8 +1,11 @@
 package ca.autoworks.techlense
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +22,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.types.RegistrationState
 import ca.autoworks.techlense.demo.*
 import ca.autoworks.techlense.diagnostics.*
 import ca.autoworks.techlense.evidence.*
@@ -29,9 +35,13 @@ private val Workspace=Color(0xFFF3F4F4)
 private val Muted=Color(0xFF667176)
 
 class MainActivity:ComponentActivity(){
+ private val datPermissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){grants->
+  if(grants.values.all{it}) Wearables.initialize(this)
+ }
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{
   MaterialTheme(colorScheme=lightColorScheme(primary=MekGreen,surface=Color.White,background=Workspace)){MekViewAlpha()}
  }}
+ override fun onStart(){super.onStart();val required=arrayOf(Manifest.permission.BLUETOOTH,Manifest.permission.BLUETOOTH_CONNECT);if(required.all{ContextCompat.checkSelfPermission(this,it)==PackageManager.PERMISSION_GRANTED}) Wearables.initialize(this) else datPermissions.launch(required)}
 }
 
 @Composable private fun MekViewAlpha(){
@@ -128,8 +138,21 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
   item{Card(Modifier.fillMaxWidth()){Text(s.concern,Modifier.padding(18.dp),style=MaterialTheme.typography.bodyLarge)}}
   item{SectionTitle("Diagnostic progress")}
   item{InfoCard("Scan",if(s.dtcs.isEmpty())"Not started" else s.dtcs.size.toString()+" DTC(s) found","Evidence",s.evidence.size.toString()+" item(s)")}
-  item{Text("Tekmetric • Autel • Repair information are simulated in this alpha.",color=Muted,style=MaterialTheme.typography.bodySmall)}
+  item{GlassesCard()
+  item{Text("Tekmetric • Autel • Repair information are simulated in this alpha.",color=Muted,style=MaterialTheme.typography.bodySmall)}}
  }
+}
+
+@Composable private fun GlassesCard(){
+ val activity=LocalContext.current as? MainActivity
+ val registration by Wearables.registrationState.collectAsState()
+ val devices by Wearables.devices.collectAsState()
+ Card(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+  Text("MekView Glasses",fontWeight=FontWeight.Bold)
+  Text(when(registration){RegistrationState.REGISTERED->if(devices.isEmpty()) "Registered • No glasses detected" else "Registered • "+devices.size+" device(s) detected";else->"Not registered with Meta AI"},color=if(registration==RegistrationState.REGISTERED)MekGreen else Muted)
+  if(registration!=RegistrationState.REGISTERED) Button(onClick={activity?.let{Wearables.startRegistration(it)}},Modifier.fillMaxWidth()){Text("CONNECT META GLASSES")}
+  else Text("Connection layer ready. Camera session is the next milestone.",style=MaterialTheme.typography.bodySmall,color=Muted)
+ }}
 }
 
 @Composable private fun ScanScreen(s:DemoRepairSession,set:(DemoRepairSession)->Unit){
