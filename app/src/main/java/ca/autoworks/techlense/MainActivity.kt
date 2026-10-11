@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -267,7 +269,7 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
 
 @Composable private fun VehicleHeader(s:DemoRepairSession,onBack:()->Unit){
  Column(Modifier.fillMaxWidth().background(ShopCharcoal).padding(horizontal=20.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("‹",Modifier.clickable{onBack()},color=Color.White,style=MaterialTheme.typography.headlineMedium);Text(s.roNumber,color=Color.White,fontWeight=FontWeight.Bold);Text("MekView",color=MekGreen,fontWeight=FontWeight.Bold)}
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){IconButton(onClick=onBack,modifier=Modifier.size(48.dp)){Icon(imageVector=androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,contentDescription="Back to Job Board",tint=Color.White)};Text(s.roNumber,color=Color.White,fontWeight=FontWeight.Bold);Image(painter=painterResource(R.drawable.mekview_logo),contentDescription="MekView",modifier=Modifier.size(36.dp))}
   Text(s.vehicle,color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
   Text(s.concern,color=Color.White.copy(alpha=.82f),style=MaterialTheme.typography.bodyMedium)
   Surface(color=MekGreen.copy(alpha=.18f),shape=RoundedCornerShape(6.dp)){Text("DIAGNOSTIC SESSION",Modifier.padding(horizontal=10.dp,vertical=5.dp),color=Color.White,fontWeight=FontWeight.SemiBold)}
