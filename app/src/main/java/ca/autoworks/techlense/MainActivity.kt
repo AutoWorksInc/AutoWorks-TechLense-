@@ -255,7 +255,7 @@ private data class DemoJob(val session:DemoRepairSession,val customer:String,val
   createUri={type->EvidenceCapture.newEvidenceUri(context,type)},
   onCaptured={type,uri->s=s.copy(evidence=s.evidence+InspectionEvidence((if(type==EvidenceMediaType.PHOTO)"photo-" else "video-")+(s.evidence.size+1),type,"Pixel camera "+type.name.lowercase()+" evidence",System.currentTimeMillis(),uri.toString(),false))}
  )
- DisposableEffect(s){onDispose{onSessionChange(s)}}
+ LaunchedEffect(s){onSessionChange(s)}
  Scaffold(containerColor=Workspace,floatingActionButton={FloatingActionButton(onClick={},containerColor=MekGreen,contentColor=Color.White,shape=CircleShape){Image(painter=painterResource(R.drawable.mekview_logo),contentDescription="MekView",modifier=Modifier.size(48.dp))}}){p->
   Column(Modifier.padding(p).fillMaxSize()){
    VehicleHeader(s,onBack)
